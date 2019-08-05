@@ -16,7 +16,6 @@ from ryu.lib.packet import packet
 class TCP_RyuApp(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
     lldp_struct = {}
-    
 
     def __init__(self,*args,**kwargs):
         super(TCP_RyuApp,self).__init__(*args,**kwargs)
