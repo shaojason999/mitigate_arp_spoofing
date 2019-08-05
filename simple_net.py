@@ -51,9 +51,11 @@ def MininetTopo(argv):
     # become a dhcp server
     dhcp_server.cmd("~/bin/start_dhcp")
 
-#    h10.cmd("dhclient")
-#    h70.cmd("dhclient")
-#    h30.cmd("dhclient")
+    h10.cmd("dhclient -r")
+    h10.cmd("dhclient")
+#    h20.cmd("dhclient")
+    h30.cmd("dhclient -r")
+    h30.cmd("dhclient")
 #    h40.cmd("dhclient")
 #    h50.cmd("dhclient")
 #    h60.cmd("dhclient")

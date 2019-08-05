@@ -20,7 +20,7 @@ class TCP_RyuApp(app_manager.RyuApp):
         self.DHCP_port = 3
         self.DHCP_dpid = 3
         self.DHCP_dp = []
-        self.host_to_dp = {}
+        self.mac_to_dp = {}
         self.tranID_to_host = {}
         self.ip_to_mac = {}
         self.mac_to_port = {}
@@ -40,7 +40,6 @@ class TCP_RyuApp(app_manager.RyuApp):
         parser = datapath.ofproto_parser
 
         to_controller_action = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
-        flood_action = [parser.OFPActionOutput(ofproto.OFPP_FLOOD)]
 
         #DHCP
         ## port 67, 68 for DHCP; DHCP packets to CP rule.
@@ -57,11 +56,17 @@ class TCP_RyuApp(app_manager.RyuApp):
         self.add_flow(datapath,50,dhcp_to_client_match,[])
 
 
-        # ARP packets to CP rule.
+        # ARP packets to CP rule
         arp_request_match = parser.OFPMatch(eth_type=0x0806,arp_op=1)
         arp_reply_match = parser.OFPMatch(eth_type=0x0806,arp_op=2)
         self.add_flow(datapath,40,arp_request_match,to_controller_action)
         self.add_flow(datapath,40,arp_reply_match,[])
+
+        # LP and LRP packets to CP rule
+        LP_match = parser.OFPMatch(eth_type=0x5ff)
+        LRP_match = parser.OFPMatch(eth_type=0x600)
+        self.add_flow(datapath,30,LP_match,to_controller_action)
+        self.add_flow(datapath,30,LRP_match,to_controller_action)
 
         # table-miss flow entry
         match = parser.OFPMatch()
@@ -104,15 +109,17 @@ class TCP_RyuApp(app_manager.RyuApp):
                 xid = pkt_dhcp.xid
                 if dst_port == 67:  # DHCP from client to server
                     self.tranID_to_host[xid] = src
-                    self.host_to_dp[src] = datapath
+                    self.mac_to_dp[src] = datapath
                     action = [parser.OFPActionOutput(self.DHCP_port)]
                     out = parser.OFPPacketOut(datapath = self.DHCP_dp,buffer_id = ofproto.OFP_NO_BUFFER,in_port = ofproto.OFPP_CONTROLLER,actions = action,data=data)
                     self.DHCP_dp.send_msg(out)
                     print("client to server")
                     return
                 elif dst_port == 68:
+                    self.ip_to_mac[pkt_ipv4.src] = src  # record the DHCP's ip_to_mac match
+                    self.mac_to_dp[src] = datapath
                     dst = self.tranID_to_host[xid]
-                    datapath = self.host_to_dp[dst]
+                    datapath = self.mac_to_dp[dst]
                     port = self.mac_to_port[datapath.id][dst]
 
                     options = pkt_dhcp.options.option_list
@@ -132,50 +139,100 @@ class TCP_RyuApp(app_manager.RyuApp):
         if pkt_arp:
             if pkt_arp.dst_ip not in self.ip_to_mac:
                 return
-            opcode = pkt_arp.opcode
             dst = self.ip_to_mac[pkt_arp.dst_ip]
-            # it must add_protocol() in order: ethernet, then arp
+            ## it must add_protocol() in order: ethernet, then arp
+            ## ARP reply to src
             pkt = packet.Packet()
-            pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ether.ethertype,
+            pkt.add_protocol(ethernet.ethernet(ethertype=0x806,
                 dst=src,src=dst))
             pkt.add_protocol(arp.arp(opcode=arp.ARP_REPLY,
                 src_mac=dst,src_ip=pkt_arp.dst_ip,
                 dst_mac=pkt_arp.src_mac,dst_ip=pkt_arp.src_ip))
             self.send_packet(datapath,in_port,pkt)
+
+            # start to send LP
+            pkt = packet.Packet()
+            pkt.add_protocol(ethernet.ethernet(ethertype=0x5ff,dst=dst,src=src))
+            self.send_packet(datapath,ofproto.OFPP_FLOOD,pkt)
             return
-        
-        if dst in self.mac_to_port[dpid]:
-            out_port = self.mac_to_port[dpid][dst]
-        else:
-            out_port = ofproto.OFPP_FLOOD
 
-        actions = [parser.OFPActionOutput(out_port)]
-        
-        if out_port != ofproto.OFPP_FLOOD:
-            match = parser.OFPMatch(in_port = in_port,eth_dst=dst)
-            self.add_flow(datapath,1,match,actions)
+        # LRP; the src here is the same as the src of LP
+        if pkt_ether.ethertype == 0x600:
+            # insert bi-directional flow entries
+            dst_port = self.mac_to_port[dpid][dst]
+            print(src,dst,dst_port)
+            actions = [parser.OFPActionOutput(dst_port)]
+            match = parser.OFPMatch(in_port=in_port,eth_dst=dst)
+            self.add_flow(datapath,10,match,actions)
 
-#        data = None
-#        if msg.buffer_id == ofproto.OFP_NO_BUFFER:
-#            data = msg.data
+            actions = [parser.OFPActionOutput(in_port)]
+            match = parser.OFPMatch(in_port=dst_port,eth_dst=src)
+            self.add_flow(datapath,10,match,actions)
+            if datapath == self.mac_to_dp[dst]:
+                return
+            else:
+                data = None
+                if msg.buffer_id == ofproto.OFP_NO_BUFFER:
+                    data = msg.data
+                actions = [parser.OFPActionOutput(dst_port)]
+                out = parser.OFPPacketOut(datapath = datapath,buffer_id = msg.buffer_id,in_port = in_port,actions = actions,data=data)
+                datapath.send_msg(out)
+                return
+
+        # LP
+        if pkt_ether.ethertype == 0x5ff:
+            print("111")
+            if datapath == self.mac_to_dp[dst]:
+                # insert bi-directional flow entries
+                dst_port = self.mac_to_port[dpid][dst]
+                print("222",dpid,dst_port)
+                actions = [parser.OFPActionOutput(dst_port)]
+                match = parser.OFPMatch(in_port=in_port,eth_dst=dst)
+                self.add_flow(datapath,10,match,actions)
+
+                actions = [parser.OFPActionOutput(in_port)]
+                match = parser.OFPMatch(in_port=dst_port,eth_dst=src)
+                self.add_flow(datapath,10,match,actions)
+
+                # start to send LRP, do not change the src and dst, but only change the ethertype
+                pkt = packet.Packet()
+                pkt.add_protocol(ethernet.ethernet(ethertype=0x600,dst=src,src=dst))
+                self.send_packet(datapath,in_port,pkt)
+                return
+            else:
+                data = None
+                if msg.buffer_id == ofproto.OFP_NO_BUFFER:
+                    data = msg.data
+                actions = [parser.OFPActionOutput(ofproto.OFPP_FLOOD)]
+                out = parser.OFPPacketOut(datapath = datapath,buffer_id = msg.buffer_id,in_port = in_port,actions = actions,data=data)
+                datapath.send_msg(out)
+                return
 
 
-#        out = parser.OFPPacketOut(datapath = datapath,buffer_id = msg.buffer_id,in_port = in_port,actions = actions,data=data)
-        out = parser.OFPPacketOut(datapath = datapath,buffer_id = ofproto.OFP_NO_BUFFER,in_port = in_port,actions = actions,data=data)
-        datapath.send_msg(out)
-    
+
+            # ARP reply to dst
+            """
+            pkt = packet.Packet()
+            pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ether.ethertype,
+                dst="ff:ff:ff:ff:ff:ff",src=src))
+#                dst=dst,src=src))
+            pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST,
+                src_mac=pkt_arp.src_mac,src_ip=pkt_arp.src_ip,
+                dst_mac="00:00:00:00:00:00",dst_ip=pkt_arp.dst_ip))
+#                dst_mac=dst,dst_ip=pkt_arp.dst_ip))
+            datapath = self.mac_to_dp[dst]
+            port = self.mac_to_port[datapath.id][dst]
+            self.send_packet(datapath,port,pkt)
+            return
+            """
                            
     def send_packet(self,datapath,port,pkt):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
-        print(pkt)
         pkt.serialize()
-        print(pkt)
         data = pkt.data
-        print(data)
         action = [parser.OFPActionOutput(port)]
         out = parser.OFPPacketOut(datapath = datapath,buffer_id = ofproto.OFP_NO_BUFFER,in_port = ofproto.OFPP_CONTROLLER,actions = action,data=data)
         datapath.send_msg(out)
-
 
 
