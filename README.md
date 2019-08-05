@@ -9,7 +9,7 @@
 	$ ./mininet_start.sh
 	```
 ### ps
-1. clean the mininet before a new star t(included in controller_start.sh)
+1. clean the mininet first if there is a problem when creting a mininet
   ```
   $ sudo mn -c
   ```
