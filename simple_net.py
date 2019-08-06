@@ -53,12 +53,18 @@ def MininetTopo(argv):
 
     h10.cmd("dhclient -r")
     h10.cmd("dhclient")
-#    h20.cmd("dhclient")
+    h20.cmd("dhclient -r")
+    h20.cmd("dhclient")
+
     h30.cmd("dhclient -r")
     h30.cmd("dhclient")
+#    h40.cmd("dhclient -r")
 #    h40.cmd("dhclient")
-#    h50.cmd("dhclient")
+
+#    h60.cmd("dhclient -r")
 #    h60.cmd("dhclient")
+#    h70.cmd("dhclient -r")
+#    h70.cmd("dhclient")
 
     net.start()
     info("Run mininet CLI.\n")
