@@ -15,7 +15,7 @@ class TCP_RyuApp(app_manager.RyuApp):
         super(TCP_RyuApp,self).__init__(*args,**kwargs)
         # set the topology(locaion) of the DHCP server
         self.DHCP_port = 3
-        self.DHCP_dpid = 3
+        self.DHCP_dpid = 30
         self.DHCP_dp = []
         self.mac_to_dp = {}
         self.tranID_to_host = {}
@@ -138,9 +138,11 @@ class TCP_RyuApp(app_manager.RyuApp):
         # ARP
         ## handle ARP request
         if pkt_arp:
+            print("ARP_request")
             dst_ip = pkt_arp.dst_ip
             src_ip = pkt_arp.src_ip
             if dst_ip not in self.ip_to_mac:
+                print("match failed")
                 return
             dst = self.ip_to_mac[dst_ip]
 
@@ -226,6 +228,7 @@ class TCP_RyuApp(app_manager.RyuApp):
 
         # LP
         if pkt_ether.ethertype == 0x5ff:
+            print(pkt)
             if datapath == self.mac_to_dp[dst]: # reach the dst
                 # insert bi-directional flow entries
                 dst_port = self.mac_to_port[dpid][dst]
