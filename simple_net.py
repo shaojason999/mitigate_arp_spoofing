@@ -7,7 +7,6 @@ from mininet.node import OVSSwitch, Controller, RemoteController
 from mininet.link import Link, TCLink
 import sys, getopt
 
-
 def MininetTopo(argv):
     
 #    net = Mininet(controller=RemoteController, link=TCLink, switch=OVSKernelSwitch)
