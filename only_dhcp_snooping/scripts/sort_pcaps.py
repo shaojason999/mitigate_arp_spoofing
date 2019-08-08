@@ -70,11 +70,12 @@ def main():
     read_LP(host_ports)
     read_ARP(host_ports)
     read_all(host_ports)
-
+    
     print("###### Packet in ######")
     read_LP(controller)
     read_ARP(controller)
     read_all(controller)
+    
 
 if __name__ == '__main__':
 #    print("Making sure the pcap magic number is correct")

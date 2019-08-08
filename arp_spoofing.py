@@ -3,8 +3,10 @@ from ryu.controller import ofp_event, dpset
 from ryu.controller.handler import CONFIG_DISPATCHER,MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3, ofproto_v1_3_parser
-from ryu.lib.packet import ethernet,arp, tcp, udp, dhcp, ipv4
+from ryu.lib.packet import ethernet, arp, tcp, udp, dhcp, ipv4
 from ryu.lib.packet import packet
+from ryu.lib import pcaplib
+# from scapy.all import wrpcap, sniff
 
 
 class TCP_RyuApp(app_manager.RyuApp):
@@ -13,6 +15,7 @@ class TCP_RyuApp(app_manager.RyuApp):
 
     def __init__(self,*args,**kwargs):
         super(TCP_RyuApp,self).__init__(*args,**kwargs)
+        self.pcap_writer = pcaplib.Writer(open('pcaps/packet_in.pcap','wb'))
         # set the topology(locaion) of the DHCP server
         self.DHCP_port = 3
         self.DHCP_dpid = 30
@@ -88,6 +91,12 @@ class TCP_RyuApp(app_manager.RyuApp):
         pkt_ether = pkt.get_protocol(ethernet.ethernet)
         pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
         pkt_arp = pkt.get_protocol(arp.arp)
+
+#        for a in pkt:
+#            print a
+#        pkt_pcap = (pkt[len(pkt)-1])
+#        wrpcap('pcaps/packet_in.pcap',pkt_pcap,append=True)
+        self.pcap_writer.write_pkt(data)
         
         if not pkt_ether:
             return
@@ -228,7 +237,6 @@ class TCP_RyuApp(app_manager.RyuApp):
 
         # LP
         if pkt_ether.ethertype == 0x5ff:
-            print(pkt)
             if datapath == self.mac_to_dp[dst]: # reach the dst
                 # insert bi-directional flow entries
                 dst_port = self.mac_to_port[dpid][dst]

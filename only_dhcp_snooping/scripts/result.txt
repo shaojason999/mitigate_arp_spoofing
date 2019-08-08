@@ -1,0 +1,20 @@
+###### Inner ports ######
+LP/LRP total size: 0 bytes
+ARP total size: 338016 bytes
+Total size: 381680 bytes
+###### Inner ports + Edge ports ######
+LP/LRP total size: 0 bytes
+ARP total size: 634704 bytes
+Total size: 743947 bytes
+###### s30-eth3 ######
+LP/LRP total size: 0 bytes
+ARP total size: 42756 bytes
+Total size: 59515 bytes
+###### Host ports ######
+LP/LRP total size: 0 bytes
+ARP total size: 253932 bytes
+Total size: 302518 bytes
+###### Packet in ######
+LP/LRP total size: 0 bytes
+ARP total size: 253764 bytes
+Total size: 280986 bytes

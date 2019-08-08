@@ -5,6 +5,7 @@ from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3, ofproto_v1_3_parser
 from ryu.lib.packet import ethernet,arp, tcp, udp, dhcp, ipv4
 from ryu.lib.packet import packet
+from ryu.lib import pcaplib
 
 class TCP_RyuApp(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
@@ -12,9 +13,10 @@ class TCP_RyuApp(app_manager.RyuApp):
 
     def __init__(self,*args,**kwargs):
         super(TCP_RyuApp,self).__init__(*args,**kwargs)
+        self.pcap_writer = pcaplib.Writer(open('pcaps/packet_in.pcap','wb'))
         # set the topology(locaion) of the DHCP server
         self.DHCP_port = 3
-        self.DHCP_dpid = 3
+        self.DHCP_dpid = 30
         self.DHCP_dp = []
         self.mac_to_dp = {}
         self.tranID_to_host = {}
@@ -78,6 +80,8 @@ class TCP_RyuApp(app_manager.RyuApp):
         pkt_ether = pkt.get_protocol(ethernet.ethernet)
         pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
         pkt_arp = pkt.get_protocol(arp.arp)
+
+        self.pcap_writer.write_pkt(data)
         
         if not pkt_ether:
             return
