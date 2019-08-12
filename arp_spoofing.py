@@ -6,7 +6,7 @@ from ryu.ofproto import ofproto_v1_3, ofproto_v1_3_parser
 from ryu.lib.packet import ethernet, arp, tcp, udp, dhcp, ipv4
 from ryu.lib.packet import packet
 from ryu.lib import pcaplib
-# from scapy.all import wrpcap, sniff
+from scapy.all import Ether
 
 
 class TCP_RyuApp(app_manager.RyuApp):
@@ -92,10 +92,6 @@ class TCP_RyuApp(app_manager.RyuApp):
         pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
         pkt_arp = pkt.get_protocol(arp.arp)
 
-#        for a in pkt:
-#            print a
-#        pkt_pcap = (pkt[len(pkt)-1])
-#        wrpcap('pcaps/packet_in.pcap',pkt_pcap,append=True)
         self.pcap_writer.write_pkt(data)
         
         if not pkt_ether:
@@ -147,7 +143,6 @@ class TCP_RyuApp(app_manager.RyuApp):
         # ARP
         ## handle ARP request
         if pkt_arp:
-            print("ARP_request")
             dst_ip = pkt_arp.dst_ip
             src_ip = pkt_arp.src_ip
             if dst_ip not in self.ip_to_mac:
@@ -155,8 +150,9 @@ class TCP_RyuApp(app_manager.RyuApp):
                 return
             dst = self.ip_to_mac[dst_ip]
 
+
             # already learned LP/LRP, just send ARP reply
-            if (dst,src) in self.LP_learned or (src,dst) in self.LP_learned:
+            if ((dst,src) in self.LP_learned) or ((src,dst) in self.LP_learned):
                 pkt = packet.Packet()
                 pkt.add_protocol(ethernet.ethernet(ethertype=0x806,
                     dst=src,src=dst))
@@ -193,13 +189,18 @@ class TCP_RyuApp(app_manager.RyuApp):
                     return
                 else:
                     # start to send LP
-                    pkt = packet.Packet()
-                    pkt.add_protocol(ethernet.ethernet(ethertype=0x5ff,dst=dst,src=src))
-                    self.send_packet(datapath,ofproto.OFPP_FLOOD,pkt)
+                    pkt = Ether(src=src,dst=dst,type=0x5ff)
+                    pkt = str(pkt)
+                    self.scapy_send_packet(datapath,ofproto.OFPP_FLOOD,pkt)
                     return
 
         # LRP; the dst of LRP is the src of LP
         if pkt_ether.ethertype == 0x600:
+            print("LRP")
+            print(src,dst)
+            print(self.LP_learned)
+            print((dst,src) in self.LP_learned)
+            print((src,dst) in self.LP_learned)
             # insert bi-directional flow entries
             dst_port = self.mac_to_port[dpid][dst]
             actions = [parser.OFPActionOutput(dst_port)]
@@ -224,9 +225,12 @@ class TCP_RyuApp(app_manager.RyuApp):
                     dst_mac=dst,dst_ip=dst_ip))
                 self.send_packet(datapath,dst_port,pkt)
 
+                print("!!!!!!!!reach!!!!!!!!")
+
                 self.LP_learned.add((src,dst))
                 return
             else:
+                print("!!!!!!!!not reach!!!!!!!!!!!")
                 data = None
                 if msg.buffer_id == ofproto.OFP_NO_BUFFER:
                     data = msg.data
@@ -237,6 +241,7 @@ class TCP_RyuApp(app_manager.RyuApp):
 
         # LP
         if pkt_ether.ethertype == 0x5ff:
+            print("LP")
             if datapath == self.mac_to_dp[dst]: # reach the dst
                 # insert bi-directional flow entries
                 dst_port = self.mac_to_port[dpid][dst]
@@ -248,10 +253,10 @@ class TCP_RyuApp(app_manager.RyuApp):
                 match = parser.OFPMatch(in_port=dst_port,eth_dst=src)
                 self.add_flow(datapath,10,match,actions)
 
-                # start to send LRP, do not change the src and dst, but only change the ethertype
-                pkt = packet.Packet()
-                pkt.add_protocol(ethernet.ethernet(ethertype=0x600,dst=src,src=dst))
-                self.send_packet(datapath,in_port,pkt)
+                # start to send LRP, use scapy module
+                pkt = Ether(src=dst,dst=src,type=0x600)
+                pkt = str(pkt)
+                self.scapy_send_packet(datapath,in_port,pkt)
                 return
             else:   # flooding
                 data = None
@@ -261,24 +266,6 @@ class TCP_RyuApp(app_manager.RyuApp):
                 out = parser.OFPPacketOut(datapath = datapath,buffer_id = msg.buffer_id,in_port = in_port,actions = actions,data=data)
                 datapath.send_msg(out)
                 return
-
-
-
-            # ARP reply to dst
-            """
-            pkt = packet.Packet()
-            pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ether.ethertype,
-                dst="ff:ff:ff:ff:ff:ff",src=src))
-#                dst=dst,src=src))
-            pkt.add_protocol(arp.arp(opcode=arp.ARP_REQUEST,
-                src_mac=pkt_arp.src_mac,src_ip=pkt_arp.src_ip,
-                dst_mac="00:00:00:00:00:00",dst_ip=pkt_arp.dst_ip))
-#                dst_mac=dst,dst_ip=pkt_arp.dst_ip))
-            datapath = self.mac_to_dp[dst]
-            port = self.mac_to_port[datapath.id][dst]
-            self.send_packet(datapath,port,pkt)
-            return
-            """
                            
     def send_packet(self,datapath,port,pkt):
         ofproto = datapath.ofproto
@@ -287,6 +274,14 @@ class TCP_RyuApp(app_manager.RyuApp):
         data = pkt.data
         action = [parser.OFPActionOutput(port)]
         out = parser.OFPPacketOut(datapath = datapath,buffer_id = ofproto.OFP_NO_BUFFER,in_port = ofproto.OFPP_CONTROLLER,actions = action,data=data)
+        datapath.send_msg(out)
+
+
+    def scapy_send_packet(self,datapath,port,pkt):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        action = [parser.OFPActionOutput(port)]
+        out = parser.OFPPacketOut(datapath = datapath,buffer_id = ofproto.OFP_NO_BUFFER,in_port = ofproto.OFPP_CONTROLLER,actions = action,data=pkt)
         datapath.send_msg(out)
 
 

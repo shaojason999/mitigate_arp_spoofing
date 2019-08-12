@@ -1,7 +1,8 @@
 from scapy.all import *
-COUNT = 1000
+import time
 
-pkt = Ether(src="52:8d:ff:7e:e7:f6", dst="ff:ff:ff:ff:ff:ff")/ARP(op=ARP.who_has, hwdst="ff:ff:ff:ff:ff:ff", pdst="192.168.1.82", hwsrc="52:8d:ff:7e:e7:f6", psrc="192.168.1.96" )
+pkt = Ether(src="00:00:00:00:00:01", dst="ff:ff:ff:ff:ff:ff")/ARP(op=ARP.who_has, hwdst="ff:ff:ff:ff:ff:ff", pdst="192.168.1.93", hwsrc="00:00:00:00:00:01", psrc="192.168.1.96" )
 
-for _ in range(COUNT):
-    sendp(pkt)
+t1 = time.time()
+sendp(pkt,count=1000,inter=1./100,verbose=False)
+print("Time elapsed: {}".format(time.time()-t1))

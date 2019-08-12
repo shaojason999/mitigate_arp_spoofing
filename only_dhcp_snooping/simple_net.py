@@ -13,10 +13,10 @@ def MininetTopo(argv):
     net = Mininet()
 
     info("Create host nodes.\n")
-    h10 = net.addHost('h10', ip='no ip defined/8')
-    h20 = net.addHost('h20', ip='no ip defined/8')
-    h30 = net.addHost('h30', ip='no ip defined/8')
-    h40 = net.addHost('h40', ip='no ip defined/8')
+    h10 = net.addHost('h10', ip='no ip defined/8', mac='00:00:00:00:00:01')
+    h20 = net.addHost('h20', ip='no ip defined/8', mac='00:00:00:00:00:02')
+    h30 = net.addHost('h30', ip='no ip defined/8', mac='00:00:00:00:00:03')
+    h40 = net.addHost('h40', ip='no ip defined/8', mac='00:00:00:00:00:04')
     hosts = ['h10','h20','h30','h40']
     dhcp_server = net.addHost('h50', ip='192.168.1.1/24')
 
