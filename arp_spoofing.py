@@ -146,7 +146,6 @@ class TCP_RyuApp(app_manager.RyuApp):
             dst_ip = pkt_arp.dst_ip
             src_ip = pkt_arp.src_ip
             if dst_ip not in self.ip_to_mac:
-                print("match failed")
                 return
             dst = self.ip_to_mac[dst_ip]
 
@@ -196,11 +195,6 @@ class TCP_RyuApp(app_manager.RyuApp):
 
         # LRP; the dst of LRP is the src of LP
         if pkt_ether.ethertype == 0x600:
-            print("LRP")
-            print(src,dst)
-            print(self.LP_learned)
-            print((dst,src) in self.LP_learned)
-            print((src,dst) in self.LP_learned)
             # insert bi-directional flow entries
             dst_port = self.mac_to_port[dpid][dst]
             actions = [parser.OFPActionOutput(dst_port)]
@@ -225,12 +219,9 @@ class TCP_RyuApp(app_manager.RyuApp):
                     dst_mac=dst,dst_ip=dst_ip))
                 self.send_packet(datapath,dst_port,pkt)
 
-                print("!!!!!!!!reach!!!!!!!!")
-
                 self.LP_learned.add((src,dst))
                 return
             else:
-                print("!!!!!!!!not reach!!!!!!!!!!!")
                 data = None
                 if msg.buffer_id == ofproto.OFP_NO_BUFFER:
                     data = msg.data
@@ -241,7 +232,6 @@ class TCP_RyuApp(app_manager.RyuApp):
 
         # LP
         if pkt_ether.ethertype == 0x5ff:
-            print("LP")
             if datapath == self.mac_to_dp[dst]: # reach the dst
                 # insert bi-directional flow entries
                 dst_port = self.mac_to_port[dpid][dst]
