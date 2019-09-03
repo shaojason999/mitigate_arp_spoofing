@@ -1,7 +1,7 @@
 # Mitigation of ARP Spoofing
 ## 成大資工專題展
 1. we came up with a new mechanism to mitigate ARP spoofing
-2. implemented in OpenFlow and P4, and this repo contains only OpenFlow
+2. implemented in OpenFlow and P4, but this repo contains only OpenFlow
 3. the common solution for ARP spoofing is called DAI, which is used to compare to our mechanism and it is in the ./only_dhcp_snooping folder
 
 ### topology
